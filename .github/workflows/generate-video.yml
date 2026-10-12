@@ -1,0 +1,50 @@
+name: Generate video
+
+on:
+  workflow_dispatch:
+    inputs:
+      brief:
+        description: What the video should show (any language)
+        required: true
+        type: string
+      image_url:
+        description: Optional first frame (public https URL)
+        required: false
+        type: string
+      max_videos:
+        description: Cap on billable generations
+        required: false
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - name: Run agent
+        env:
+          HF_KEY: ${{ secrets.HF_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Inputs go through env, not inline ${{ }}, so they cannot inject shell commands.
+          BRIEF: ${{ inputs.brief }}
+          IMAGE_URL: ${{ inputs.image_url }}
+          MAX_VIDEOS: ${{ inputs.max_videos }}
+        run: |
+          args=("$BRIEF" --max-videos "$MAX_VIDEOS")
+          if [ -n "$IMAGE_URL" ]; then args+=(--image "$IMAGE_URL"); fi
+          higgsfield-agent "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: videos
+          path: outputs/
+          if-no-files-found: ignore
