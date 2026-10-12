@@ -16,6 +16,11 @@ on:
         required: false
         default: "1"
         type: string
+      direct:
+        description: Skip Claude and send the brief as the prompt (no Anthropic credits needed)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -31,6 +36,8 @@ jobs:
           python-version: "3.12"
       - run: pip install .
       - name: Run agent
+        # Explicit bash enables pipefail, so a failing agent fails the job despite the tee.
+        shell: bash
         env:
           HF_KEY: ${{ secrets.HF_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -38,9 +45,11 @@ jobs:
           BRIEF: ${{ inputs.brief }}
           IMAGE_URL: ${{ inputs.image_url }}
           MAX_VIDEOS: ${{ inputs.max_videos }}
+          DIRECT: ${{ inputs.direct }}
         run: |
           args=("$BRIEF" --max-videos "$MAX_VIDEOS")
           if [ -n "$IMAGE_URL" ]; then args+=(--image "$IMAGE_URL"); fi
+          if [ "$DIRECT" = "true" ]; then args+=(--direct); fi
           higgsfield-agent "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
